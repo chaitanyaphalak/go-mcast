@@ -78,6 +78,8 @@ func (d Deliver) Commit(m types.Message) types.Response {
 			res.Success = true
 			res.Data = c.Data
 			res.Extra = c.Extensions
+		case []types.Message:
+
 		default:
 			res.Success = false
 			res.Failure = fmt.Errorf("commit unknown response. %#v", c)

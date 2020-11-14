@@ -25,7 +25,7 @@ func DefaultConfiguration(name types.Partition) *types.Configuration {
 		Replication: 3,
 		Version:     types.LatestProtocolVersion,
 		Conflict:    &definition.AlwaysConflict{},
-		Storage:     definition.NewInMemoryStorage(),
+		Storage:     nil,
 		Logger:      definition.NewDefaultLogger(),
 	}
 }

@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/jabolina/go-mcast/pkg/mcast/helper"
 	"github.com/jabolina/go-mcast/pkg/mcast/types"
 	"sync"
@@ -202,6 +201,7 @@ func (p *Peer) FastRead(request types.Request) (types.Response, error) {
 		Extra:      nil,
 		Failure:    nil,
 	}
+	/*
 	data, err := p.storage.Get(request.Key)
 	if err != nil {
 		res.Failure = err
@@ -212,11 +212,12 @@ func (p *Peer) FastRead(request types.Request) (types.Response, error) {
 		res.Failure = err
 		return res, nil
 	}
+	 */
 
 	res.Success = true
-	res.Identifier = entry.Identifier
-	res.Data = entry.Data
-	res.Extra = entry.Extensions
+	// res.Identifier = entry.Identifier
+	// res.Data = entry.Data
+	// res.Extra = entry.Extensions
 	return res, nil
 }
 

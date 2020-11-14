@@ -30,28 +30,29 @@ type InMemoryStateMachine struct {
 // while some other operations is just querying the state
 // machine for values.
 func (i *InMemoryStateMachine) Commit(entry *Entry) (interface{}, error) {
+	storage := StorageEntry{Key: entry.Identifier, Value: entry.Data, Type: entry.Operation}
 	switch entry.Operation {
 	// Some entry will be changed.
 	case Command:
-		data, err := json.Marshal(entry)
-		if err != nil {
-			return nil, err
-		}
-		if err := i.store.Set(entry.Key, data); err != nil {
+		if err := i.store.Set(storage); err != nil {
 			return nil, err
 		}
 		return entry, nil
 	// Read an entry.
 	case Query:
-		data, err := i.store.Get(entry.Key)
+		data, err := i.store.Get()
 		if err != nil {
 			return nil, err
 		}
-		var message Message
-		if err := json.Unmarshal(data, &message); err != nil {
-			return nil, err
+		var response []Message
+		for _, stored := range data {
+			var message Message
+			if err := json.Unmarshal(stored.Value, &message); err != nil {
+				return nil, err
+			}
+			response = append(response, message)
 		}
-		return message, nil
+		return response, nil
 	default:
 		return nil, ErrCommandUnknown
 	}
