@@ -7,7 +7,6 @@ import (
 
 func GenerateRandomRequest(partitions []types.Partition) types.Request {
 	return types.Request{
-		Key:         []byte(helper.GenerateUID()),
 		Value:       []byte(helper.GenerateUID()),
 		Extra:       []byte(helper.GenerateUID()),
 		Destination: partitions,
@@ -16,7 +15,6 @@ func GenerateRandomRequest(partitions []types.Partition) types.Request {
 
 func GenerateRandomRequestValue(key []byte, partitions []types.Partition) types.Request {
 	return types.Request{
-		Key:         key,
 		Value:       []byte(helper.GenerateUID()),
 		Extra:       []byte(helper.GenerateUID()),
 		Destination: partitions,
@@ -25,7 +23,6 @@ func GenerateRandomRequestValue(key []byte, partitions []types.Partition) types.
 
 func GenerateRequest(key, value []byte, partitions []types.Partition) types.Request {
 	return types.Request{
-		Key:         key,
 		Value:       value,
 		Extra:       nil,
 		Destination: partitions,

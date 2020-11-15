@@ -18,7 +18,7 @@ import (
 // equal as well.
 type Log interface {
 	// Add the message to the tail of the log structure. This is thread-safe.
-	Append(message Message) error
+	Append(Message, bool) error
 
 	// Dump the whole command history at the time of the issued request. This
 	// will lock the structure for reading, so there is no guarantee that the
@@ -33,20 +33,16 @@ type Log interface {
 	SizeInBytes() uint64
 }
 
-type LogEntry struct {
-	Data []byte
-
-	Operation Operation
-
-	GenericDelivered bool
-}
-
 // Final Log implementation to hold the information.
 // This struct will keep information in-memory, a good todo
 // is to find a better approach to hold this information.
 type AppendOnlyLog struct {
 	// Synchronize operations.
 	mutex *sync.Mutex
+
+	// A Storage implementation, that can be used to persist the information
+	// to a stable storage.
+	storage Storage
 
 	// List of commands, append only.
 	log []LogEntry
@@ -58,13 +54,14 @@ type AppendOnlyLog struct {
 	bytesCount uint64
 }
 
-func NewLogStructure() Log {
+func NewLogStructure(storage Storage) Log {
 	return &AppendOnlyLog{
-		mutex:      &sync.Mutex{},
+		mutex:   &sync.Mutex{},
+		storage: storage,
 	}
 }
 
-func (a *AppendOnlyLog) Append(message Message) error {
+func (a *AppendOnlyLog) Append(message Message, isGenericDeliver bool) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	data, err := json.Marshal(message)
@@ -76,9 +73,13 @@ func (a *AppendOnlyLog) Append(message Message) error {
 	entry := LogEntry{
 		Data:             data,
 		Operation:        message.Content.Operation,
-		GenericDelivered: false,
+		GenericDelivered: isGenericDeliver,
 	}
 	a.log = append(a.log, entry)
+	if Command == message.Content.Operation {
+		storage := StorageEntry{Key: message.Identifier, Value: message.Content}
+		return a.storage.Set(storage)
+	}
 	return nil
 }
 

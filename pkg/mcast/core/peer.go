@@ -50,7 +50,7 @@ type PartitionPeer interface {
 	//
 	// See that if a write was issued, is not guaranteed
 	// that the read will be executed after the write.
-	FastRead(request types.Request) (types.Response, error)
+	FastRead() types.Response
 
 	// Stop the peer.
 	Stop()
@@ -91,10 +91,10 @@ type Peer struct {
 	// right order.
 	deliver Deliverable
 
-	// Holds the peer storage, this will be used
+	// Holds the peer log, this will be used
 	// for reads only, all writes will come from the
 	// state machine when a commit is applied.
-	storage types.Storage
+	logAbstraction types.Log
 
 	// Conflict relationship for ordering the messages.
 	conflict types.ConflictRelationship
@@ -126,7 +126,8 @@ func NewPeer(configuration *types.PeerConfiguration, log types.Logger) (Partitio
 	}
 
 	ctx, done := context.WithCancel(context.Background())
-	deliver, err := NewDeliver(ctx, log, configuration.Conflict, configuration.Storage)
+	logStructure := types.NewLogStructure(configuration.Storage)
+	deliver, err := NewDeliver(ctx, log, configuration.Conflict, logStructure)
 	if err != nil {
 		done()
 		return nil, err
@@ -143,7 +144,7 @@ func NewPeer(configuration *types.PeerConfiguration, log types.Logger) (Partitio
 		},
 		previousSet: NewPreviousSet(),
 		deliver:     deliver,
-		storage:     configuration.Storage,
+		logAbstraction: logStructure,
 		conflict:    configuration.Conflict,
 		log:         log,
 		received:    NewMemo(),
@@ -167,9 +168,7 @@ func (p *Peer) Command(message types.Message) <-chan types.Response {
 		if err != nil {
 			finalResponse := types.Response{
 				Success:    false,
-				Identifier: message.Identifier,
-				Data:       message.Content.Content,
-				Extra:      message.Content.Extensions,
+				Data:       []types.DataHolder{message.Content},
 				Failure:    err,
 			}
 
@@ -193,32 +192,26 @@ func (p *Peer) Command(message types.Message) <-chan types.Response {
 }
 
 // Implements the PartitionPeer interface.
-func (p *Peer) FastRead(request types.Request) (types.Response, error) {
+func (p *Peer) FastRead() types.Response {
 	res := types.Response{
 		Success:    false,
-		Identifier: "",
 		Data:       nil,
-		Extra:      nil,
 		Failure:    nil,
 	}
-	/*
-	data, err := p.storage.Get(request.Key)
+	data, err := p.logAbstraction.Dump()
 	if err != nil {
+		res.Success = false
+		res.Data = nil
 		res.Failure = err
-		return res, err
+		return res
 	}
-	var entry types.Entry
-	if err := json.Unmarshal(data, &entry); err != nil {
-		res.Failure = err
-		return res, nil
-	}
-	 */
 
 	res.Success = true
-	// res.Identifier = entry.Identifier
-	// res.Data = entry.Data
-	// res.Extra = entry.Extensions
-	return res, nil
+	res.Failure = nil
+	for _, message := range data {
+		res.Data = append(res.Data, message.Content)
+	}
+	return res
 }
 
 // Implements the PartitionPeer interface.
@@ -456,7 +449,8 @@ func (p Peer) reprocessMessage(uid types.UID) {
 // local peer state machine.
 func (p *Peer) doDeliver(m types.Message) {
 	p.received.Remove(m.Identifier)
-	res := p.deliver.Commit(m)
+	// TODO: validate if is generic delivery.
+	res := p.deliver.Commit(m, false)
 	p.invoker.Spawn(func() {
 		p.mutex.Lock()
 		defer p.mutex.Unlock()

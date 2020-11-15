@@ -120,42 +120,43 @@ func (c *UnityCluster) Next() mcast.Unity {
 	return c.Unities[c.index]
 }
 
-func (c UnityCluster) DoesClusterMatchTo(key []byte, expected []byte) {
-	r := GenerateRandomRequestValue(key, c.Names)
-	for i, unity := range c.Unities {
-		res, err := unity.Read(r)
-		if err != nil {
-			c.T.Errorf("failed reading from partition 1. %v", err)
-			continue
-		}
+func (c UnityCluster) DoesClusterMatchTo(expected []types.DataHolder) {
+	for _, unity := range c.Unities {
+		res := unity.Read()
 
 		if !res.Success {
 			c.T.Errorf("reading partition 1 failed. %v", res.Failure)
 			continue
 		}
 
-		if !bytes.Equal(expected, res.Data) {
-			c.T.Errorf("peer %d differ. %s|%s but expected %s", i, string(res.Data), res.Identifier, string(expected))
+		if len(res.Data) != len(expected) {
+			c.T.Errorf("C-Hist differ on size, expected %d found %d", len(expected), len(res.Data))
+		}
+
+		for index, holder := range res.Data {
+			expectedData := expected[index]
+			if !bytes.Equal(expectedData.Key, holder.Key) {
+				c.T.Errorf("Keys differ, expected %s, found %s", string(expectedData.Key), string(holder.Key))
+				continue
+			}
+
+			if !bytes.Equal(expectedData.Content, holder.Content) {
+				c.T.Errorf("Content differ cmd %d, expected %s, found %s", index, string(expectedData.Content), string(holder.Content))
+				continue
+			}
 		}
 	}
 }
 
-func (c UnityCluster) DoesAllClusterMatch(key []byte) {
+func (c UnityCluster) DoesAllClusterMatch() {
 	first := c.Unities[0]
-	r := GenerateRandomRequestValue(key, c.Names)
-	res, err := first.Read(r)
-	if err != nil {
-		c.T.Errorf("failed reding first peer. %v", err)
-		return
-	}
+	res:= first.Read()
 
 	if !res.Success {
 		c.T.Errorf("something wrong readin. %v", res.Failure)
 		return
 	}
-
-	c.T.Logf("cluster agrees on %s with %s", string(res.Data), res.Identifier)
-	c.DoesClusterMatchTo(key, res.Data)
+	c.DoesClusterMatchTo(res.Data)
 }
 
 func (c *UnityCluster) PoweroffUnity(unity mcast.Unity) {

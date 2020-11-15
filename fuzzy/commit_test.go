@@ -42,7 +42,7 @@ func Test_SequentialCommands(t *testing.T) {
 	}
 
 	time.Sleep(10 * time.Second)
-	cluster.DoesClusterMatchTo(key, []byte("Z"))
+	cluster.DoesAllClusterMatch()
 }
 
 func Test_ConcurrentCommands(t *testing.T) {
@@ -77,6 +77,6 @@ func Test_ConcurrentCommands(t *testing.T) {
 		t.Errorf("not finished all after 30 seconds!")
 	} else {
 		time.Sleep(10 * time.Second)
-		cluster.DoesAllClusterMatch(key)
+		cluster.DoesAllClusterMatch()
 	}
 }

@@ -87,9 +87,6 @@ type HeaderExtract interface {
 // the final user do not have to handle information about
 // the protocol.
 type Request struct {
-	// The request key the value will be associated with.
-	Key []byte
-
 	// The concrete value that will be replicated.
 	Value []byte
 
@@ -109,19 +106,16 @@ type Response struct {
 	// The request was completed successfully.
 	Success bool
 
-	// After sending a message, the user will receive the
-	// message unique identifier to verify if the value
-	// is already committed on the state machine.
-	Identifier UID
+	// The response data for the client.
+	// This is a slice of DataHolder in case the requested
+	// operation is to Dump the log file.
+	// At this moment, the response will be the data available
+	// on the Log, when a Command Query is executed the whole
+	// sequence of commands will be returned.
+	Data []DataHolder
 
-	// Replicated data.
-	Data []byte
-
-	// Replicated extra information.
-	Extra []byte
-
-	// If an error happened, this will transfer the
-	// error back.
+	// If an error happened, this will transfer the error back
+	// to the client.
 	Failure error
 }
 

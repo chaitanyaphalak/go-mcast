@@ -27,7 +27,7 @@ type Unity interface {
 	Write(request types.Request) <-chan types.Response
 
 	// Query a value from the unity.
-	Read(request types.Request) (types.Response, error)
+	Read() types.Response
 
 	// Shutdown the unity.
 	// This is NOT a graceful shutdown, everything that
@@ -89,7 +89,6 @@ func (p *PeerUnity) Write(request types.Request) <-chan types.Response {
 		Identifier: id,
 		Content: types.DataHolder{
 			Operation:  types.Command,
-			Key:        request.Key,
 			Content:    request.Value,
 			Extensions: request.Extra,
 		},
@@ -104,9 +103,9 @@ func (p *PeerUnity) Write(request types.Request) <-chan types.Response {
 }
 
 // Implements the Unity interface.
-func (p *PeerUnity) Read(request types.Request) (types.Response, error) {
+func (p *PeerUnity) Read() types.Response {
 	peer := p.resolveNextPeer()
-	return peer.FastRead(request)
+	return peer.FastRead()
 }
 
 // Implements the Unity interface.
