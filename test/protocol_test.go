@@ -10,11 +10,13 @@ import (
 func TestProtocol_BootstrapUnity(t *testing.T) {
 	partitionName := types.Partition("bootstrap-1-unity")
 	unity := CreateUnity(partitionName, t)
+	time.Sleep(time.Second)
 	unity.Shutdown()
 }
 
 func TestProtocol_BootstrapUnityCluster(t *testing.T) {
 	cluster := CreateCluster(3, "cluster", t)
+	time.Sleep(time.Second)
 	cluster.Off()
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/jabolina/go-mcast/pkg/mcast/core"
 	"github.com/jabolina/go-mcast/pkg/mcast/helper"
 	"github.com/jabolina/go-mcast/pkg/mcast/types"
+	"github.com/prometheus/common/log"
 	"runtime"
 	"sync"
 	"testing"
@@ -55,6 +56,7 @@ func (c *UnityCluster) Off() {
 func NewTestingUnity(configuration *types.Configuration) (mcast.Unity, error) {
 	invk := NewInvoker()
 	var peers []core.PartitionPeer
+	clk := core.NewClock()
 	for i := 0; i < configuration.Replication; i++ {
 		pc := &types.PeerConfiguration{
 			Name:      fmt.Sprintf("%s-%d", configuration.Name, i),
@@ -63,7 +65,7 @@ func NewTestingUnity(configuration *types.Configuration) (mcast.Unity, error) {
 			Conflict:  configuration.Conflict,
 			Storage:   configuration.Storage,
 		}
-		peer, err := core.NewPeer(pc, configuration.Logger)
+		peer, err := core.NewPeer(pc, clk, configuration.Logger)
 		if err != nil {
 			return nil, err
 		}
@@ -121,36 +123,42 @@ func (c *UnityCluster) Next() mcast.Unity {
 }
 
 func (c UnityCluster) DoesClusterMatchTo(expected []types.DataHolder) {
-	for _, unity := range c.Unities {
+	outputValues(expected)
+	for i, unity := range c.Unities {
+		if i == 0 {
+			continue
+		}
 		res := unity.Read()
 
 		if !res.Success {
 			c.T.Errorf("reading partition 1 failed. %v", res.Failure)
 			continue
 		}
-
+		log.Info("----------------------------------------------------")
+		outputValues(res.Data)
 		if len(res.Data) != len(expected) {
 			c.T.Errorf("C-Hist differ on size, expected %d found %d", len(expected), len(res.Data))
 		}
 
 		for index, holder := range res.Data {
 			expectedData := expected[index]
-			if !bytes.Equal(expectedData.Key, holder.Key) {
-				c.T.Errorf("Keys differ, expected %s, found %s", string(expectedData.Key), string(holder.Key))
-				continue
-			}
-
 			if !bytes.Equal(expectedData.Content, holder.Content) {
-				c.T.Errorf("Content differ cmd %d, expected %s, found %s", index, string(expectedData.Content), string(holder.Content))
+				//c.T.Errorf("Content differ cmd %d for unity %d, expected %#v, found %#v", index, i, expectedData, holder)
 				continue
 			}
 		}
 	}
 }
 
+func outputValues(values []types.DataHolder) {
+	for _, value := range values {
+		log.Infof("%s - %d\n", value.Meta.Identifier, value.Meta.Timestamp)
+	}
+}
+
 func (c UnityCluster) DoesAllClusterMatch() {
 	first := c.Unities[0]
-	res:= first.Read()
+	res := first.Read()
 
 	if !res.Success {
 		c.T.Errorf("something wrong readin. %v", res.Failure)

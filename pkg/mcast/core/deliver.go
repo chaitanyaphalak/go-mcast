@@ -60,9 +60,9 @@ func NewDeliver(ctx context.Context, log types.Logger, conflict types.ConflictRe
 // Listener interface.
 func (d Deliver) Commit(m types.Message, isGenericDelivery bool) types.Response {
 	res := types.Response{
-		Success:    false,
-		Data:       nil,
-		Failure:    nil,
+		Success: false,
+		Data:    nil,
+		Failure: nil,
 	}
 	d.log.Debugf("commit request %#v", m)
 	err := d.sm.Commit(m, isGenericDelivery)

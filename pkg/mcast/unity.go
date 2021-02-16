@@ -54,6 +54,7 @@ type PeerUnity struct {
 func NewUnity(configuration *types.Configuration) (Unity, error) {
 	invk := core.InvokerInstance()
 	var peers []core.PartitionPeer
+	clk := core.NewClock()
 	for i := 0; i < configuration.Replication; i++ {
 		pc := &types.PeerConfiguration{
 			Name:      fmt.Sprintf("%s-%d", configuration.Name, i),
@@ -62,7 +63,7 @@ func NewUnity(configuration *types.Configuration) (Unity, error) {
 			Conflict:  configuration.Conflict,
 			Storage:   configuration.Storage,
 		}
-		peer, err := core.NewPeer(pc, configuration.Logger)
+		peer, err := core.NewPeer(pc, clk, configuration.Logger)
 		if err != nil {
 			return nil, err
 		}

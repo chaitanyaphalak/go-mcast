@@ -20,4 +20,3 @@ func (e EmptyStorage) Set(entry types.StorageEntry) error {
 func (e EmptyStorage) Get() ([]types.StorageEntry, error) {
 	return nil, nil
 }
-

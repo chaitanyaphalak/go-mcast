@@ -1,15 +1,21 @@
 package types
 
+// Holds metadata for the content.
+// Internal usage only.
+type Meta struct {
+	// Final agreed Timestamp.
+	Timestamp uint64
+
+	// Identifier used for the protocol.
+	Identifier UID
+}
+
 // Used to transfer information.
 type DataHolder struct {
+	Meta Meta
+
 	// What kind of operation is being executed.
 	Operation Operation
-
-	// This will be used to associate the value with something
-	// so the retrieval can be done more easily.
-	// If nothing is provided, will be generated a value to
-	// be used based on the cluster information.
-	Key []byte
 
 	// If there is any value to be written into the
 	// state machine it will be hold here.

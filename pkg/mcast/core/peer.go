@@ -119,7 +119,7 @@ type Peer struct {
 
 // Creates a new peer for the given configuration and
 // start polling for new messages.
-func NewPeer(configuration *types.PeerConfiguration, log types.Logger) (PartitionPeer, error) {
+func NewPeer(configuration *types.PeerConfiguration, clk LogicalClock, log types.Logger) (PartitionPeer, error) {
 	t, err := NewTransport(configuration, log)
 	if err != nil {
 		return nil, err
@@ -134,26 +134,24 @@ func NewPeer(configuration *types.PeerConfiguration, log types.Logger) (Partitio
 	}
 
 	p := &Peer{
-		mutex:         &sync.Mutex{},
-		observers:     make(map[types.UID]observer),
-		invoker:       InvokerInstance(),
-		configuration: configuration,
-		transport:     t,
-		clock: &ProcessClock{
-			mutex: &sync.Mutex{},
-		},
-		previousSet: NewPreviousSet(),
-		deliver:     deliver,
+		mutex:          &sync.Mutex{},
+		observers:      make(map[types.UID]observer),
+		invoker:        InvokerInstance(),
+		configuration:  configuration,
+		transport:      t,
+		clock:          clk,
+		previousSet:    NewPreviousSet(),
+		deliver:        deliver,
 		logAbstraction: logStructure,
-		conflict:    configuration.Conflict,
-		log:         log,
-		received:    NewMemo(),
-		updated:     make(chan types.Message),
-		context:     ctx,
-		finish:      done,
+		conflict:       configuration.Conflict,
+		log:            log,
+		received:       NewMemo(),
+		updated:        make(chan types.Message),
+		context:        ctx,
+		finish:         done,
 	}
-	applyDeliver := func(i interface{}) {
-		p.doDeliver(i.(types.Message))
+	applyDeliver := func(i interface{}, isGenericDeliver bool) {
+		p.doDeliver(i.(types.Message), isGenericDeliver)
 	}
 	p.rqueue = NewQueue(ctx, configuration.Conflict, applyDeliver)
 	p.invoker.Spawn(p.poll)
@@ -162,14 +160,14 @@ func NewPeer(configuration *types.PeerConfiguration, log types.Logger) (Partitio
 
 // Implements the PartitionPeer interface.
 func (p *Peer) Command(message types.Message) <-chan types.Response {
-	res := make(chan types.Response)
+	res := make(chan types.Response, 1)
 	apply := func() {
 		err := p.transport.Broadcast(message)
 		if err != nil {
 			finalResponse := types.Response{
-				Success:    false,
-				Data:       []types.DataHolder{message.Content},
-				Failure:    err,
+				Success: false,
+				Data:    []types.DataHolder{message.Content},
+				Failure: err,
 			}
 
 			select {
@@ -194,9 +192,9 @@ func (p *Peer) Command(message types.Message) <-chan types.Response {
 // Implements the PartitionPeer interface.
 func (p *Peer) FastRead() types.Response {
 	res := types.Response{
-		Success:    false,
-		Data:       nil,
-		Failure:    nil,
+		Success: false,
+		Data:    nil,
+		Failure: nil,
 	}
 	data, err := p.logAbstraction.Dump()
 	if err != nil {
@@ -447,10 +445,9 @@ func (p Peer) reprocessMessage(uid types.UID) {
 // contains the lowest timestamp, so the message is ready to
 // be delivered, which means, it will be committed on the
 // local peer state machine.
-func (p *Peer) doDeliver(m types.Message) {
+func (p *Peer) doDeliver(m types.Message, isGenericDeliver bool) {
 	p.received.Remove(m.Identifier)
-	// TODO: validate if is generic delivery.
-	res := p.deliver.Commit(m, false)
+	res := p.deliver.Commit(m, isGenericDeliver)
 	p.invoker.Spawn(func() {
 		p.mutex.Lock()
 		defer p.mutex.Unlock()

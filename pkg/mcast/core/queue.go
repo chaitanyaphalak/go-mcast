@@ -18,7 +18,7 @@ type Queue interface {
 
 	// Subscribe a function to be executed when the
 	// head element changes.
-	Subscribe(func(interface{}))
+	Subscribe(func(interface{}, bool))
 
 	// Get the element if it exists on the memory.
 	GetIfExists(id string) interface{}
@@ -86,11 +86,11 @@ type RQueue struct {
 
 	// Deliver function to be executed when the head element changes.
 	// We will be notified by the PriorityQueue.
-	deliver func(interface{})
+	deliver func(interface{}, bool)
 }
 
 // Create a new queue data structure.
-func NewQueue(ctx context.Context, conflict types.ConflictRelationship, f func(interface{})) Queue {
+func NewQueue(ctx context.Context, conflict types.ConflictRelationship, f func(interface{}, bool)) Queue {
 	headChannel := make(chan types.Message)
 	r := &RQueue{
 		ctx:        ctx,
@@ -112,18 +112,14 @@ func NewQueue(ctx context.Context, conflict types.ConflictRelationship, f func(i
 // The values are held by a cache where each key can
 // live up to 10 minutes.
 func (r *RQueue) IsEligible(i interface{}) bool {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
 	m := i.(types.Message)
 	return !r.applied.Contains(string(m.Identifier))
 }
 
 func (r RQueue) verifyAndDeliverHead(message types.Message) {
 	if r.IsEligible(message) {
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
 		r.applied.Set(string(message.Identifier))
-		r.deliver(message)
+		r.deliver(message, false)
 	}
 	r.set.Pop()
 }
@@ -151,8 +147,6 @@ func (r *RQueue) poll() {
 // The cache will hold messages that already removed and
 // cannot be inserted again.
 func (r *RQueue) verifyAndInsert(message types.Message) bool {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
 	r.set.Push(message)
 	return true
 }
@@ -184,18 +178,15 @@ func (r *RQueue) Enqueue(i interface{}) bool {
 // Implements the Queue interface.
 // Insert a function that will be called when the
 // element at the head of the queue changes.
-func (r *RQueue) Subscribe(f func(interface{})) {
+func (r *RQueue) Subscribe(f func(interface{}, bool)) {
 	r.deliver = f
 }
 
 // Implements the Queue interface.
 func (r *RQueue) Dequeue(i interface{}) interface{} {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
 	m := i.(types.Message)
-	value := r.set.GetByKey(m.Identifier)
-	if value != nil {
+	value, ok := r.set.GetByKey(m.Identifier)
+	if ok {
 		r.applied.Set(string(m.Identifier))
 		r.set.Remove(m.Identifier)
 		return value
@@ -205,11 +196,9 @@ func (r *RQueue) Dequeue(i interface{}) interface{} {
 
 // Implements the Queue interface.
 func (r *RQueue) GetIfExists(id string) interface{} {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	v := r.set.GetByKey(types.UID(id))
-	if v != nil {
-		return *v
+	v, ok := r.set.GetByKey(types.UID(id))
+	if ok {
+		return v
 	}
 	return nil
 }
@@ -221,9 +210,6 @@ func (r *RQueue) GenericDeliver(i interface{}) {
 	}
 
 	message := i.(types.Message)
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
 	var messages []types.Message
 	// This will copy the slice at the time of read.
 	// This method does not guarantee that we have the
@@ -241,6 +227,6 @@ func (r *RQueue) GenericDeliver(i interface{}) {
 	// then it can be delivered directly.
 	if !r.conflict.Conflict(message, messages) {
 		r.Dequeue(message)
-		r.deliver(message)
+		r.deliver(message, true)
 	}
 }

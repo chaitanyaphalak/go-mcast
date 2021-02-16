@@ -62,8 +62,16 @@ func NewLogStructure(storage Storage) Log {
 }
 
 func (a *AppendOnlyLog) Append(message Message, isGenericDeliver bool) error {
+	if Command != message.Content.Operation {
+		return nil
+	}
+
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
+	message.Content.Meta = Meta{
+		Timestamp:  message.Timestamp,
+		Identifier: message.Identifier,
+	}
 	data, err := json.Marshal(message)
 	if err != nil {
 		return err
@@ -76,11 +84,8 @@ func (a *AppendOnlyLog) Append(message Message, isGenericDeliver bool) error {
 		GenericDelivered: isGenericDeliver,
 	}
 	a.log = append(a.log, entry)
-	if Command == message.Content.Operation {
-		storage := StorageEntry{Key: message.Identifier, Value: message.Content}
-		return a.storage.Set(storage)
-	}
-	return nil
+	storage := StorageEntry{Key: message.Identifier, Value: message.Content}
+	return a.storage.Set(storage)
 }
 
 func (a *AppendOnlyLog) Dump() ([]Message, error) {

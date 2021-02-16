@@ -42,7 +42,7 @@ type RecvQueue interface {
 
 	// Get the Message element by the given UID. If the value is
 	// not present returns nil.
-	GetByKey(uid types.UID) *types.Message
+	GetByKey(uid types.UID) (types.Message, bool)
 }
 
 // A priority queue that uses a heap for ordering elements.
@@ -276,14 +276,20 @@ func (p *PriorityQueue) Remove(uid types.UID) {
 func (p *PriorityQueue) Values() []types.Message {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	return p.values
+	var messages []types.Message
+
+	// This will copy the slice at the time of read.
+	messages = append(messages, p.values...)
+	return messages
 }
 
 // Implements the RecvQueue interface.
-func (p *PriorityQueue) GetByKey(uid types.UID) *types.Message {
+func (p *PriorityQueue) GetByKey(uid types.UID) (types.Message, bool) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	index := p.getIndexByUid(uid)
 	if index < 0 {
-		return nil
+		return types.Message{}, false
 	}
-	return &p.values[index]
+	return p.values[index], true
 }

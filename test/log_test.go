@@ -13,8 +13,11 @@ func TestLog_AppendAndRead(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		uid := types.UID(helper.GenerateUID())
 		msg := types.Message{
-			Timestamp: uint64(i),
+			Timestamp:  uint64(i),
 			Identifier: uid,
+			Content: types.DataHolder{
+				Operation: types.Command,
+			},
 		}
 		log.Append(msg, false)
 		uids = append(uids, uid)

@@ -83,7 +83,7 @@ func (r *ReliableTransport) Broadcast(message types.Message) error {
 			Address: relt.GroupAddress(partition),
 			Data:    data,
 		}
-		if err = r.relt.Broadcast(m); err != nil {
+		if err = r.relt.Broadcast(r.context, m); err != nil {
 			r.log.Errorf("failed sending %#v. %v", m, err)
 			return err
 		}
@@ -102,7 +102,7 @@ func (r *ReliableTransport) Unicast(message types.Message, partition types.Parti
 		Address: relt.GroupAddress(partition),
 		Data:    data,
 	}
-	return r.relt.Broadcast(m)
+	return r.relt.Broadcast(r.context, m)
 }
 
 // ReliableTransport implements Transport interface.
@@ -112,8 +112,10 @@ func (r *ReliableTransport) Listen() <-chan types.Message {
 
 // ReliableTransport implements Transport interface.
 func (r *ReliableTransport) Close() {
-	r.relt.Close()
 	r.finish()
+	if err := r.relt.Close(); err != nil {
+		r.log.Errorf("failed stopping transport. %#v", err)
+	}
 }
 
 // This method will keep polling until
@@ -122,15 +124,22 @@ func (r *ReliableTransport) Close() {
 // transport channel will be sent to the consume
 // method to be parsed and publish to the listeners.
 func (r ReliableTransport) poll() {
+	listener, err := r.relt.Consume()
+	if err != nil {
+		panic(err)
+	}
 	for {
 		select {
 		case <-r.context.Done():
 			return
-		case recv, ok := <-r.relt.Consume():
+		case recv, ok := <-listener:
 			if !ok {
 				return
 			}
-			r.consume(recv)
+			r.consume(relt.Recv{
+				Data:  recv.Data,
+				Error: recv.Error,
+			})
 		}
 	}
 }
