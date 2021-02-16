@@ -148,17 +148,6 @@ func (r ReliableTransport) poll() {
 // and will parse into a valid object to be consumed
 // by the channel listener.
 func (r *ReliableTransport) consume(recv relt.Recv) {
-	defer func() {
-		if err := recover(); err != nil {
-			select {
-			case <-r.context.Done():
-				close(r.producer)
-			default:
-				r.consume(recv)
-			}
-		}
-	}()
-
 	if recv.Error != nil {
 		r.log.Errorf("failed consuming message. %v", recv.Error)
 		return
@@ -174,8 +163,10 @@ func (r *ReliableTransport) consume(recv relt.Recv) {
 		return
 	}
 
+	timeout, cancel := context.WithTimeout(r.context, 250*time.Millisecond)
+	defer cancel()
 	select {
-	case <-time.After(100 * time.Millisecond):
+	case <-timeout.Done():
 		r.log.Warnf("failed consuming %#v", m)
 		return
 	case r.producer <- m:

@@ -99,7 +99,7 @@ func (p *PeerUnity) Write(request types.Request) <-chan types.Response {
 		From:        p.Configuration.Name,
 	}
 	peer := p.resolveNextPeer()
-	p.Configuration.Logger.Infof("sending request %#v", request)
+	p.Configuration.Logger.Infof("sending request %#v from %s\n", request, p.Configuration.Name)
 	return peer.Command(message)
 }
 

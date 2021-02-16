@@ -77,6 +77,7 @@ func TestProtocol_GMCastMessageTwoPartitions(t *testing.T) {
 	unityOne := CreateUnity(partitionOne, t)
 	unityTwo := CreateUnity(partitionTwo, t)
 	defer unityOne.Shutdown()
+	defer unityTwo.Shutdown()
 	value := []byte("test")
 	write := types.Request{
 		Value:       value,
@@ -111,6 +112,7 @@ func TestProtocol_GMCastMessageTwoPartitions(t *testing.T) {
 
 	if len(res.Data) != 1 {
 		t.Errorf("Expected 1 command, found %d", len(res.Data))
+		return
 	}
 
 	cmd := res.Data[0]

@@ -28,15 +28,9 @@ func Test_SequentialCommands(t *testing.T) {
 	for _, letter := range test.Alphabet {
 		log.Printf("************************** sending %s **************************", letter)
 		req := test.GenerateRequest(key, []byte(letter), cluster.Names)
-		obs := cluster.Next().Write(req)
-		select {
-		case res := <-obs:
-			if !res.Success {
-				t.Errorf("failed writting request %v", res.Failure)
-				break
-			}
-		case <-time.After(3 * time.Second):
-			t.Errorf("write %s timeout %#v", letter, req)
+		res := <-cluster.Next().Write(req)
+		if !res.Success {
+			t.Errorf("failed writting request %v", res.Failure)
 			break
 		}
 	}
@@ -59,10 +53,9 @@ func Test_ConcurrentCommands(t *testing.T) {
 	group := sync.WaitGroup{}
 	write := func(idx int, val string) {
 		defer group.Done()
-		u := cluster.Next()
 		log.Printf("************************** sending %s **************************", val)
 		req := test.GenerateRequest(key, []byte(val), cluster.Names)
-		res := <-u.Write(req)
+		res := <-cluster.Next().Write(req)
 		if !res.Success {
 			t.Errorf("failed writting request %v", res.Failure)
 		}
@@ -73,7 +66,7 @@ func Test_ConcurrentCommands(t *testing.T) {
 		go write(i, content)
 	}
 
-	if !test.WaitThisOrTimeout(group.Wait, 30*time.Second) {
+	if !test.WaitThisOrTimeout(group.Wait, 60*time.Second) {
 		t.Errorf("not finished all after 30 seconds!")
 	} else {
 		time.Sleep(10 * time.Second)

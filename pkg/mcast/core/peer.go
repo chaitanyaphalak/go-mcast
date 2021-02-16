@@ -375,11 +375,7 @@ func (p Peer) send(message types.Message, t types.MessageType, emission emission
 	if emission == inner {
 		destination = append(destination, p.configuration.Partition)
 	} else {
-		for _, partition := range message.Destination {
-			if partition != p.configuration.Partition {
-				destination = append(destination, partition)
-			}
-		}
+		destination = append(destination, message.Destination...)
 	}
 
 	for _, partition := range destination {
