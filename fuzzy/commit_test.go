@@ -40,7 +40,7 @@ func Test_SequentialCommands(t *testing.T) {
 }
 
 func Test_ConcurrentCommands(t *testing.T) {
-	cluster := test.CreateCluster(3, "concurrent", t)
+	cluster := test.CreateCluster(2, "concurrent", t)
 	defer func() {
 		if !test.WaitThisOrTimeout(cluster.Off, 30*time.Second) {
 			t.Error("failed shutdown cluster")
@@ -59,15 +59,18 @@ func Test_ConcurrentCommands(t *testing.T) {
 		if !res.Success {
 			t.Errorf("failed writting request %v", res.Failure)
 		}
+		t.Logf("finished %#v", res)
 	}
 
-	for i, content := range test.Alphabet {
-		group.Add(1)
+	sample := []string{"a", "b"}
+	group.Add(len(sample))
+	for i, content := range sample {
 		go write(i, content)
 	}
 
-	if !test.WaitThisOrTimeout(group.Wait, 60*time.Second) {
+	if !test.WaitThisOrTimeout(group.Wait, 30*time.Second) {
 		t.Errorf("not finished all after 30 seconds!")
+		cluster.DoesAllClusterMatch()
 	} else {
 		time.Sleep(10 * time.Second)
 		cluster.DoesAllClusterMatch()

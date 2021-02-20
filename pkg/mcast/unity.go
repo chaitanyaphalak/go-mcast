@@ -33,6 +33,8 @@ type Unity interface {
 	// This is NOT a graceful shutdown, everything that
 	// is going on will stop.
 	Shutdown()
+
+	WhoAmI() types.Partition
 }
 
 // Concrete implementation of the Unity interface.
@@ -99,7 +101,7 @@ func (p *PeerUnity) Write(request types.Request) <-chan types.Response {
 		From:        p.Configuration.Name,
 	}
 	peer := p.resolveNextPeer()
-	p.Configuration.Logger.Infof("sending request %#v from %s\n", request, p.Configuration.Name)
+	p.Configuration.Logger.Infof("sending message %#v from %s\n", message, p.Configuration.Name)
 	return peer.Command(message)
 }
 
@@ -115,6 +117,11 @@ func (p *PeerUnity) Shutdown() {
 		peer.Stop()
 	}
 	p.Invoker.Stop()
+}
+
+// Implements the Unity interface.
+func (p *PeerUnity) WhoAmI() types.Partition {
+	return p.Configuration.Name
 }
 
 // Returns the next peer to be used. This will

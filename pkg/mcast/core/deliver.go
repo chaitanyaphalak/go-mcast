@@ -77,7 +77,16 @@ func (d Deliver) Commit(m types.Message, isGenericDelivery bool) types.Response 
 	res.Failure = nil
 	switch m.Content.Operation {
 	case types.Command:
-		res.Data = []types.DataHolder{m.Content}
+		holder := types.DataHolder{
+			Meta:       types.Meta{
+				Identifier: m.Identifier,
+				Timestamp: m.Timestamp,
+			},
+			Operation:  types.Command,
+			Content:    m.Content.Content,
+			Extensions: m.Content.Extensions,
+		}
+		res.Data = []types.DataHolder{holder}
 	case types.Query:
 		messages, err := d.sm.History()
 		if err != nil {

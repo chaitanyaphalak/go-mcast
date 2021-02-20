@@ -153,7 +153,7 @@ func NewPeer(configuration *types.PeerConfiguration, clk LogicalClock, log types
 	applyDeliver := func(i interface{}, isGenericDeliver bool) {
 		p.doDeliver(i.(types.Message), isGenericDeliver)
 	}
-	p.rqueue = NewQueue(ctx, configuration.Conflict, applyDeliver)
+	p.rqueue = NewQueue(string(configuration.Partition), ctx, configuration.Conflict, applyDeliver)
 	p.invoker.Spawn(p.poll)
 	return p, nil
 }
@@ -237,6 +237,7 @@ func (p *Peer) poll() {
 				return
 			}
 			p.invoker.Spawn(func() {
+				p.log.Infof("reprocessing %s -> %#v", p.configuration.Name, m)
 				p.send(m, types.Initial, inner)
 			})
 		case m, ok := <-p.transport.Listen():
@@ -283,7 +284,7 @@ func (p Peer) process(message types.Message) {
 		p.processInitialMessage(&message)
 	case types.External:
 		p.log.Debugf("processing external request %#v", message)
-		enqueue = p.exchangeTimestamp(&message)
+		p.exchangeTimestamp(&message)
 	default:
 		p.log.Warnf("unknown message type %d", header.Type)
 		enqueue = false
@@ -323,7 +324,6 @@ func (p *Peer) processInitialMessage(message *types.Message) {
 		if message.State == types.S0 {
 			message.State = types.S1
 			message.Timestamp = p.clock.Tock()
-			p.received.Insert(message.Identifier, p.configuration.Partition, message.Timestamp)
 			p.send(*message, types.External, outer)
 		} else if message.State == types.S2 {
 			message.State = types.S3
@@ -347,11 +347,12 @@ func (p *Peer) processInitialMessage(message *types.Message) {
 // is greater or equal to tsm, in positive case, a second consensus instance can be
 // avoided and, the state of m can jump directly to state S3 since the group local
 // clock is already bigger than tsm.
-func (p *Peer) exchangeTimestamp(message *types.Message) bool {
+func (p *Peer) exchangeTimestamp(message *types.Message) {
 	p.received.Insert(message.Identifier, message.From, message.Timestamp)
 	values := p.received.Read(message.Identifier)
 	if len(values) < len(message.Destination) {
-		return false
+		p.log.Infof("%s doing nothing %#v", p.configuration.Name, message)
+		return
 	}
 
 	tsm := helper.MaxValue(values)
@@ -361,7 +362,6 @@ func (p *Peer) exchangeTimestamp(message *types.Message) bool {
 		message.Timestamp = tsm
 		message.State = types.S2
 	}
-	return true
 }
 
 // Used to send a request using the transport API.
@@ -413,7 +413,8 @@ func (p Peer) reprocessMessage(uid types.UID) {
 		return
 	}
 	message := value.(types.Message)
-	if message.State == types.S0 || message.State == types.S2 {
+	if message.State == types.S2 {
+		p.log.Infof("state s2 %s -> %#v", p.configuration.Name, message)
 		select {
 		case <-p.context.Done():
 			return

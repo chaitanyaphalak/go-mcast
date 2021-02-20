@@ -84,6 +84,7 @@ func NewTestingUnity(configuration *types.Configuration) (mcast.Unity, error) {
 func CreateUnity(name types.Partition, t *testing.T) mcast.Unity {
 	conf := mcast.DefaultConfiguration(name)
 	conf.Logger.ToggleDebug(false)
+	conf.Replication = 1
 	unity, err := NewTestingUnity(conf)
 	if err != nil {
 		t.Fatalf("failed creating unity %s. %v", name, err)
@@ -123,19 +124,14 @@ func (c *UnityCluster) Next() mcast.Unity {
 }
 
 func (c UnityCluster) DoesClusterMatchTo(expected []types.DataHolder) {
-	outputValues(expected)
-	for i, unity := range c.Unities {
-		if i == 0 {
-			continue
-		}
+	for _, unity := range c.Unities {
 		res := unity.Read()
 
 		if !res.Success {
 			c.T.Errorf("reading partition 1 failed. %v", res.Failure)
 			continue
 		}
-		log.Info("----------------------------------------------------")
-		outputValues(res.Data)
+		outputValues(res.Data, string(unity.WhoAmI()))
 		if len(res.Data) != len(expected) {
 			c.T.Errorf("C-Hist differ on size, expected %d found %d", len(expected), len(res.Data))
 		}
@@ -150,7 +146,8 @@ func (c UnityCluster) DoesClusterMatchTo(expected []types.DataHolder) {
 	}
 }
 
-func outputValues(values []types.DataHolder) {
+func outputValues(values []types.DataHolder, owner string) {
+	log.Infof("--------------------%s-------------------------", owner)
 	for _, value := range values {
 		log.Infof("%s - %d\n", value.Meta.Identifier, value.Meta.Timestamp)
 	}

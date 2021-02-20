@@ -191,5 +191,8 @@ func (m Message) Cmp(m2 Message) int {
 // It can be the same message, but with a updated Timestamp
 // or State.
 func (m Message) Diff(m2 Message) bool {
-	return m.Identifier != m2.Identifier || m.Timestamp != m2.Timestamp || m.State != m2.State
+	if m.Identifier == m2.Identifier {
+		return m2.Timestamp > m.Timestamp || m2.State > m.State
+	}
+	return true
 }

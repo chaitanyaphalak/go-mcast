@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"github.com/jabolina/go-mcast/pkg/mcast/types"
 	"sort"
 	"sync"
@@ -58,10 +59,13 @@ type PriorityQueue struct {
 
 	// A function to verify if the given element can be notified.
 	validation func(message types.Message) bool
+
+	name string
 }
 
-func NewPriorityQueue(ch chan<- types.Message, validation func(message types.Message) bool) RecvQueue {
+func NewPriorityQueue(partition string, ch chan<- types.Message, validation func(message types.Message) bool) RecvQueue {
 	q := &PriorityQueue{
+		name:         partition,
 		mutex:        &sync.Mutex{},
 		values:       []types.Message{},
 		notification: ch,
@@ -176,6 +180,7 @@ func (p *PriorityQueue) Push(x types.Message) {
 		headStart := p.values[0]
 		defer func() {
 			headCurrent := p.values[0]
+			fmt.Printf("%s head was (%s, s %d, ts %d) head is (%s, s %d, ts %d) for %#v\n", p.name, headStart.Identifier, headStart.State, headStart.Timestamp, headCurrent.Identifier, headCurrent.State, headCurrent.Timestamp, x)
 			if headStart.Diff(headCurrent) && p.validation(headCurrent) {
 				p.sendNotification()
 			}

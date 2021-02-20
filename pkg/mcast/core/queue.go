@@ -90,7 +90,7 @@ type RQueue struct {
 }
 
 // Create a new queue data structure.
-func NewQueue(ctx context.Context, conflict types.ConflictRelationship, f func(interface{}, bool)) Queue {
+func NewQueue(name string, ctx context.Context, conflict types.ConflictRelationship, f func(interface{}, bool)) Queue {
 	headChannel := make(chan types.Message)
 	r := &RQueue{
 		ctx:        ctx,
@@ -99,7 +99,7 @@ func NewQueue(ctx context.Context, conflict types.ConflictRelationship, f func(i
 		applied:    NewTtlCache(ctx),
 		headChange: headChannel,
 		deliver:    f,
-		set: NewPriorityQueue(headChannel, func(m types.Message) bool {
+		set: NewPriorityQueue(name, headChannel, func(m types.Message) bool {
 			return m.State == types.S3
 		}),
 	}
@@ -117,11 +117,11 @@ func (r *RQueue) IsEligible(i interface{}) bool {
 }
 
 func (r RQueue) verifyAndDeliverHead(message types.Message) {
+	r.set.Pop()
 	if r.IsEligible(message) {
 		r.applied.Set(string(message.Identifier))
 		r.deliver(message, false)
 	}
-	r.set.Pop()
 }
 
 // This method will be polling while the application is
@@ -167,7 +167,7 @@ func (r *RQueue) Enqueue(i interface{}) bool {
 		// a timestamp at lest equals to the already present on memory and
 		// a state that is currently higher or equal than the previous one.
 		// Thus ensuring that the message do not "go back in time".
-		if v.Timestamp <= m.Timestamp && v.State <= m.State {
+		if m.Timestamp > v.Timestamp || m.State > v.State {
 			return r.verifyAndInsert(m)
 		}
 		return false
